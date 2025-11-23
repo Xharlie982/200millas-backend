@@ -65,6 +65,17 @@ functions:
           method: put
           cors: true
 
+  # ------------------------------
+  # MANUAL STATUS UPDATE: READY
+  # ------------------------------
+
+  manualMarkOrderReady:
+    handler: src/functions/workflow/markOrderReady.handler
+    events:
+      - http:
+          path: orders/{orderId}/ready
+          method: post
+          cors: true
 
   # ------------------------------
   # WEBSOCKETS
@@ -93,7 +104,6 @@ functions:
             detail-type:
               - Order Created
 
-
   # ------------------------------
   # MINI WORKFLOW — 2 LAMBDAS
   # ------------------------------
@@ -104,9 +114,8 @@ functions:
   markOrderReady:
     handler: src/functions/workflow/markOrderReady.handler
 
-
 # ------------------------------
-# RECURSOS AWS (DynamoDB, StepFunction, EventBridge Rule)
+# RESOURCES
 # ------------------------------
 
 resources:
@@ -140,7 +149,6 @@ resources:
             KeyType: HASH
         BillingMode: PAY_PER_REQUEST
 
-
     # --------------------------
     # STEP FUNCTION
     # --------------------------
@@ -172,7 +180,6 @@ resources:
                   - Arn
               ResultPath: "$.readyResult"
               End: true
-
 
     # --------------------------
     # EVENTBRIDGE RULE
