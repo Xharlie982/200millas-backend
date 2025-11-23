@@ -3,13 +3,16 @@ import json
 import boto3
 
 events = boto3.client("events")
+bus_name = os.environ["EVENT_BUS_NAME"]
 
-def publish(source, detail_type, detail):
+def send_event(source, detail_type, detail):
     events.put_events(
-        Entries=[{
-            "Source": source,
-            "DetailType": detail_type,
-            "Detail": json.dumps(detail),
-            "EventBusName": os.environ["EVENT_BUS_NAME"],
-        }]
+        Entries=[
+            {
+                "Source": source,
+                "DetailType": detail_type,
+                "Detail": json.dumps(detail),
+                "EventBusName": bus_name
+            }
+        ]
     )

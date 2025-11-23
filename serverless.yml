@@ -52,6 +52,13 @@ provider:
 plugins: []
 
 functions:
+  updateOrderStatus:
+    handler: src/functions/order/updateStatus.handler
+    events:
+      - http:
+          path: orders/{orderId}/status
+          method: put
+          cors: true
   createOrder:
     handler: src/functions/order/create.handler
     events:

@@ -1,6 +1,17 @@
-from src.utils.dynamodb import connections
+import os
+import boto3
+
+ddb = boto3.resource("dynamodb")
+connections_table = ddb.Table(os.environ["CONNECTIONS_TABLE"])
 
 def handler(event, context):
-    cid = event["requestContext"]["connectionId"]
-    connections().delete_item(Key={"connectionId": cid})
-    return {"statusCode": 200}
+    connection_id = event["requestContext"]["connectionId"]
+
+    connections_table.delete_item(Key={
+        "connectionId": connection_id
+    })
+
+    return {
+        "statusCode": 200,
+        "body": "disconnected"
+    }

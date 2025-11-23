@@ -1,9 +1,21 @@
 from src.utils.websocket import broadcast
 
 def handler(event, context):
-    detail = event.get("detail", {})
+    # El evento de EventBridge llega así:
+    # {
+    #   "detail-type": "Order Status Changed",
+    #   "source": "order.service",
+    #   "detail": {
+    #       "orderId": "...",
+    #       "status": "PREPARING"
+    #   }
+    # }
+
+    detail = event["detail"]
+
     broadcast({
-        "type": "order_update",
-        "detail": detail
+        "type": "ORDER_UPDATED",
+        "data": detail
     })
-    return {}
+
+    return {"statusCode": 200}
