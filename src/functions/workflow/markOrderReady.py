@@ -22,9 +22,8 @@ def handler(event, context):
     #   }
     # }
     
-    detail = event.get("detail", {})
-    order_id = detail.get("orderId")
-
+    detail = event["detail"]
+    order_id = detail["orderId"]
     if not order_id:
         raise Exception(f"Invalid event, orderId not found. Event received: {event}")
 

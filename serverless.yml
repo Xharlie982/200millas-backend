@@ -161,6 +161,7 @@ resources:
                 Fn::GetAtt:
                   - ValidateOrderLambdaFunction
                   - Arn
+              ResultPath: "$.validation"
               Next: MarkReady
 
             MarkReady:
@@ -169,6 +170,7 @@ resources:
                 Fn::GetAtt:
                   - MarkOrderReadyLambdaFunction
                   - Arn
+              ResultPath: "$.readyResult"
               End: true
 
 
