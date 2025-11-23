@@ -189,3 +189,4 @@ resources:
           - Id: "StartMiniWorkflow"
             Arn: !Ref MiniOrderWorkflow
             RoleArn: arn:aws:iam::156529843879:role/LabRole
+            InputPath: "$"
