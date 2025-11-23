@@ -8,6 +8,7 @@ provider:
   region: us-east-1
   stage: ${opt:stage, 'dev'}
 
+  # USAMOS EL ROL DE AWS ACADEMY
   iam:
     role: arn:aws:iam::156529843879:role/LabRole
 
@@ -15,12 +16,11 @@ provider:
     STAGE: ${self:provider.stage}
     ORDERS_TABLE: ${self:service}-orders-${self:provider.stage}
     CONNECTIONS_TABLE: ${self:service}-connections-${self:provider.stage}
-    EVENT_BUS_NAME: m200bus-${self:provider.stage}
-
+    EVENT_BUS_NAME: default   # <-- SEGURO, SIEMPRE EXISTE
     WEBSOCKET_ENDPOINT:
       Fn::Join:
         - ''
-        - - 'https://'
+        - - 'wss://'
           - !Ref WebsocketsApi
           - '.execute-api.'
           - ${self:provider.region}
@@ -29,20 +29,16 @@ provider:
 
 functions:
 
+  # ------------------------------
+  # ORDER CRUD
+  # ------------------------------
+
   createOrder:
     handler: src/functions/order/create.handler
     events:
       - http:
           path: orders
           method: post
-          cors: true
-
-  updateOrderStatus:
-    handler: src/functions/order/updateStatus.handler
-    events:
-      - http:
-          path: orders/{orderId}/status
-          method: put
           cors: true
 
   getOrder:
@@ -61,16 +57,17 @@ functions:
           method: get
           cors: true
 
-  workflowUpdate:
-    handler: src/functions/workflow/update.handler
+  updateOrderStatus:
+    handler: src/functions/order/updateStatus.handler
     events:
-      - eventBridge:
-          eventBus: ${self:provider.environment.EVENT_BUS_NAME}
-          pattern:
-            source:
-              - order.service
-            detail-type:
-              - Order Created
+      - http:
+          path: orders/{orderId}/status
+          method: put
+          cors: true
+
+  # ------------------------------
+  # WEBSOCKETS
+  # ------------------------------
 
   websocketConnect:
     handler: src/functions/websocket/connect.handler
@@ -88,15 +85,34 @@ functions:
     handler: src/functions/websocket/broadcast.handler
     events:
       - eventBridge:
-          eventBus: ${self:provider.environment.EVENT_BUS_NAME}
+          eventBus: default
           pattern:
             source:
               - order.service
             detail-type:
               - Order Created
 
+  # ------------------------------
+  # MINI WORKFLOW STEP FUNCTIONS
+  # ------------------------------
+
+  validateOrder:
+    handler: src/functions/workflow/validateOrder.handler
+
+  markOrderReady:
+    handler: src/functions/workflow/markOrderReady.handler
+
+
+# ------------------------------
+# RECURSOS (DynamoDB + StepFunction + Rule)
+# ------------------------------
+
 resources:
   Resources:
+
+    # --------------------------
+    # DYNAMODB TABLES
+    # --------------------------
 
     OrdersTable:
       Type: AWS::DynamoDB::Table
@@ -121,3 +137,94 @@ resources:
           - AttributeName: connectionId
             KeyType: HASH
         BillingMode: PAY_PER_REQUEST
+
+
+    # --------------------------
+    # ROLE PARA STEP FUNCTION
+    # --------------------------
+
+    MiniWorkflowRole:
+      Type: AWS::IAM::Role
+      Properties:
+        AssumeRolePolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service: states.amazonaws.com
+              Action: sts:AssumeRole
+        Policies:
+          - PolicyName: MiniWorkflowPolicy
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - lambda:InvokeFunction
+                  Resource: "*"
+
+
+    # --------------------------
+    # MINI STEP FUNCTION
+    # --------------------------
+
+    MiniOrderWorkflow:
+      Type: AWS::StepFunctions::StateMachine
+      Properties:
+        StateMachineName: mini-order-workflow-${self:provider.stage}
+        RoleArn: !GetAtt MiniWorkflowRole.Arn
+        Definition:
+          Comment: "Mini workflow de validación → READY"
+          StartAt: Validate
+          States:
+            Validate:
+              Type: Task
+              Resource: !GetAtt validateOrder.Arn
+              Next: MarkReady
+            MarkReady:
+              Type: Task
+              Resource: !GetAtt markOrderReady.Arn
+              End: true
+
+
+    # --------------------------
+    # ROLE PARA EVENTBRIDGE
+    # --------------------------
+
+    EventBridgeInvokeRole:
+      Type: AWS::IAM::Role
+      Properties:
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service: events.amazonaws.com
+              Action: sts:AssumeRole
+        Policies:
+          - PolicyName: StartExecutionPolicy
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action: states:StartExecution
+                  Resource: "*"
+
+
+    # --------------------------
+    # REGLA: EVENT CREATED → START STEP FUNCTION
+    # --------------------------
+
+    MiniOrderWorkflowStarter:
+      Type: AWS::Events::Rule
+      Properties:
+        EventBusName: default
+        EventPattern:
+          source:
+            - "order.service"
+          detail-type:
+            - "Order Created"
+        Targets:
+          - Id: "StartMiniWorkflow"
+            Arn: !Ref MiniOrderWorkflow
+            RoleArn: !GetAtt EventBridgeInvokeRole.Arn
