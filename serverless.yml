@@ -179,11 +179,17 @@ resources:
           States:
             Validate:
               Type: Task
-              Resource: !GetAtt validateOrder.Arn
+              Resource:
+                Fn::GetAtt:
+                  - ValidateOrderLambdaFunction
+                  - Arn
               Next: MarkReady
             MarkReady:
               Type: Task
-              Resource: !GetAtt markOrderReady.Arn
+              Resource:
+                Fn::GetAtt:
+                  - MarkOrderReadyLambdaFunction
+                  - Arn
               End: true
 
 
