@@ -1,13 +1,34 @@
-from src.utils.responses import response
-from src.utils.dynamodb import orders
+import json
+import boto3
+import os
+from decimal import Decimal
+
+dynamodb = boto3.resource('dynamodb')
+table = dynamodb.Table(os.environ['ORDERS_TABLE'])
+
+def convert_decimal(obj):
+    if isinstance(obj, list):
+        return [convert_decimal(i) for i in obj]
+    elif isinstance(obj, dict):
+        return {k: convert_decimal(v) for k, v in obj.items()}
+    elif isinstance(obj, Decimal):
+        return float(obj)
+    return obj
 
 def handler(event, context):
-    order_id = event["pathParameters"]["orderId"]
+    orderId = event["pathParameters"]["orderId"]
 
-    res = orders().get_item(Key={"orderId": order_id})
-    item = res.get("Item")
+    resp = table.get_item(Key={"orderId": orderId})
 
-    if not item:
-        return response(404, {"error": "Order not found"})
+    if "Item" not in resp:
+        return {
+            "statusCode": 404,
+            "body": json.dumps({"error": "Order not found"})
+        }
 
-    return response(200, item)
+    item = convert_decimal(resp["Item"])
+
+    return {
+        "statusCode": 200,
+        "body": json.dumps(item)
+    }
