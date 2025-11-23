@@ -14,57 +14,36 @@ provider:
   environment:
     STAGE: ${self:provider.stage}
     ORDERS_TABLE: ${self:service}-orders-${self:provider.stage}
-    USERS_TABLE: ${self:service}-users-${self:provider.stage}
-    RESTAURANTS_TABLE: ${self:service}-restaurants-${self:provider.stage}
     CONNECTIONS_TABLE: ${self:service}-connections-${self:provider.stage}
     EVENT_BUS_NAME: m200bus-${self:provider.stage}
-    ORDER_WORKFLOW_ARN: "placeholder"
+
     WEBSOCKET_ENDPOINT:
       Fn::Join:
         - ''
-        - - 'wss://'
+        - - 'https://'
           - !Ref WebsocketsApi
           - '.execute-api.'
           - ${self:provider.region}
           - '.amazonaws.com/'
           - ${self:provider.stage}
 
-
-  iamRoleStatements:
-    - Effect: Allow
-      Action:
-        - dynamodb:*
-      Resource:
-        - "arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.ORDERS_TABLE}"
-        - "arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.CONNECTIONS_TABLE}"
-        - "arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.ORDERS_TABLE}/index/*"
-
-    - Effect: Allow
-      Action:
-        - events:PutEvents
-      Resource: "*"
-
-    - Effect: Allow
-      Action:
-        - execute-api:ManageConnections
-      Resource: "*"
-
-plugins: []
-
 functions:
-  updateOrderStatus:
-    handler: src/functions/order/updateStatus.handler
-    events:
-      - http:
-          path: orders/{orderId}/status
-          method: put
-          cors: true
+
+  # ===== ORDER FUNCTIONS =====
   createOrder:
     handler: src/functions/order/create.handler
     events:
       - http:
           path: orders
           method: post
+          cors: true
+
+  updateOrderStatus:
+    handler: src/functions/order/updateStatus.handler
+    events:
+      - http:
+          path: orders/{orderId}/status
+          method: put
           cors: true
 
   getOrder:
@@ -83,6 +62,11 @@ functions:
           method: get
           cors: true
 
+  # ===== WORKFLOW FUNCTION =====
+  workflowUpdate:
+    handler: src/functions/workflow/update.handler
+
+  # ===== WEBSOCKETS =====
   websocketConnect:
     handler: src/functions/websocket/connect.handler
     events:
@@ -106,8 +90,31 @@ functions:
             detail-type:
               - Order Created
 
+stepFunctions:
+  stateMachines:
+    orderWorkflow:
+      name: m200-order-workflow-${self:provider.stage}
+      definition:
+        Comment: "Mini workflow demo"
+        StartAt: StartWorkflow
+        States:
+          StartWorkflow:
+            Type: Pass
+            Result: "Workflow started"
+            Next: UpdateOrder
+          UpdateOrder:
+            Type: Task
+            Resource: arn:aws:lambda:${self:provider.region}:${aws:accountId}:function:${self:service}-${self:provider.stage}-workflowUpdate
+            End: true
+
 resources:
   Resources:
+
+    EventBus:
+      Type: AWS::Events::EventBus
+      Properties:
+        Name: ${self:provider.environment.EVENT_BUS_NAME}
+
     OrdersTable:
       Type: AWS::DynamoDB::Table
       Properties:
@@ -131,3 +138,26 @@ resources:
           - AttributeName: connectionId
             KeyType: HASH
         BillingMode: PAY_PER_REQUEST
+
+    EventRuleStartWorkflow:
+      Type: AWS::Events::Rule
+      Properties:
+        EventBusName: ${self:provider.environment.EVENT_BUS_NAME}
+        EventPattern:
+          source:
+            - order.service
+          detail-type:
+            - Order Created
+        Targets:
+          - Arn:
+              Fn::GetAtt: [OrderWorkflow, Arn]
+            Id: OrderWorkflowTarget
+
+    PermissionStartWorkflow:
+      Type: AWS::Lambda::Permission
+      Properties:
+        Action: lambda:InvokeFunction
+        Principal: events.amazonaws.com
+        FunctionName:
+          Fn::GetAtt: [workflowUpdate, Arn]
+

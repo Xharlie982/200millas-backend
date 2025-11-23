@@ -1,0 +1,16 @@
+{
+  "Comment": "Mini workflow para demostrar Step Functions",
+  "StartAt": "StartWorkflow",
+  "States": {
+    "StartWorkflow": {
+      "Type": "Pass",
+      "Result": "Workflow iniciado",
+      "Next": "UpdateOrder"
+    },
+    "UpdateOrder": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:REGION:ACCOUNT:function:orderWorkflowUpdate",
+      "End": true
+    }
+  }
+}
