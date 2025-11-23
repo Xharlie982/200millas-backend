@@ -1,0 +1,123 @@
+org: guillaumeboussus
+service: 200millas-backend
+frameworkVersion: '4'
+
+provider:
+  name: aws
+  runtime: python3.14
+  region: us-east-1
+  stage: ${opt:stage, 'dev'}
+  environment:
+    ORDERS_TABLE: ${self:service}-orders-${self:provider.stage}
+    CONNECTIONS_TABLE: ${self:service}-connections-${self:provider.stage}
+    EVENT_BUS_NAME: ${self:service}-events-${self:provider.stage}
+    WEBSOCKET_ENDPOINT:
+      Fn::Join:
+        - ''
+        - - 'wss://'
+          - !Ref WebsocketsApi
+          - '.execute-api.'
+          - ${self:provider.region}
+          - '.amazonaws.com/'
+          - ${self:provider.stage}
+
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - dynamodb:*
+      Resource:
+        - "arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.ORDERS_TABLE}"
+        - "arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.CONNECTIONS_TABLE}"
+        - "arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.ORDERS_TABLE}/index/*"
+
+    - Effect: Allow
+      Action:
+        - events:PutEvents
+      Resource: "*"
+
+    - Effect: Allow
+      Action:
+        - execute-api:ManageConnections
+      Resource: "*"
+
+plugins:
+  - serverless-offline
+
+functions:
+  createOrder:
+    handler: src/functions/order/create.handler
+    events:
+      - http:
+          path: orders
+          method: post
+          cors: true
+
+  getOrder:
+    handler: src/functions/order/get.handler
+    events:
+      - http:
+          path: orders/{orderId}
+          method: get
+          cors: true
+
+  listOrders:
+    handler: src/functions/order/list.handler
+    events:
+      - http:
+          path: orders
+          method: get
+          cors: true
+
+  websocketConnect:
+    handler: src/functions/websocket/connect.handler
+    events:
+      - websocket:
+          route: $connect
+
+  websocketDisconnect:
+    handler: src/functions/websocket/disconnect.handler
+    events:
+      - websocket:
+          route: $disconnect
+
+  websocketBroadcast:
+    handler: src/functions/websocket/broadcast.handler
+    events:
+      - eventBridge:
+          eventBus: ${self:provider.environment.EVENT_BUS_NAME}
+          pattern:
+            source:
+              - order.service
+            detail-type:
+              - Order Created
+
+resources:
+  Resources:
+    OrdersTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.ORDERS_TABLE}
+        AttributeDefinitions:
+          - AttributeName: orderId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: orderId
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+
+    ConnectionsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.CONNECTIONS_TABLE}
+        AttributeDefinitions:
+          - AttributeName: connectionId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: connectionId
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+
+    EventBus:
+      Type: AWS::Events::EventBus
+      Properties:
+        Name: ${self:provider.environment.EVENT_BUS_NAME}
