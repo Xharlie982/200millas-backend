@@ -29,7 +29,6 @@ provider:
 
 functions:
 
-  # ===== ORDER FUNCTIONS =====
   createOrder:
     handler: src/functions/order/create.handler
     events:
@@ -62,7 +61,6 @@ functions:
           method: get
           cors: true
 
-  # ===== WORKFLOW UPDATE (triggered by EventBridge) =====
   workflowUpdate:
     handler: src/functions/workflow/update.handler
     events:
@@ -74,7 +72,6 @@ functions:
             detail-type:
               - Order Created
 
-  # ===== WEBSOCKETS =====
   websocketConnect:
     handler: src/functions/websocket/connect.handler
     events:
@@ -100,11 +97,6 @@ functions:
 
 resources:
   Resources:
-
-    EventBus:
-      Type: AWS::Events::EventBus
-      Properties:
-        Name: ${self:provider.environment.EVENT_BUS_NAME}
 
     OrdersTable:
       Type: AWS::DynamoDB::Table
