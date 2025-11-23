@@ -10,7 +10,7 @@ provider:
   environment:
     ORDERS_TABLE: ${self:service}-orders-${self:provider.stage}
     CONNECTIONS_TABLE: ${self:service}-connections-${self:provider.stage}
-    EVENT_BUS_NAME: ${self:service}-events-${self:provider.stage}
+    EVENT_BUS_NAME: m200-events-bus-${self:provider.stage}
     WEBSOCKET_ENDPOINT:
       Fn::Join:
         - ''
