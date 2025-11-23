@@ -1,27 +1,41 @@
+from decimal import Decimal
 import json
-from src.utils.dynamodb import orders, gen_id, now
-from src.utils.responses import response
-from src.utils.eventbridge import publish
+import os
+import boto3
+import uuid
+from boto3.dynamodb.conditions import Key
+
+dynamodb = boto3.resource('dynamodb')
+
+def decimalize(obj):
+    """Recursively convert floats to Decimal"""
+    if isinstance(obj, list):
+        return [decimalize(i) for i in obj]
+    elif isinstance(obj, dict):
+        return {k: decimalize(v) for k, v in obj.items()}
+    elif isinstance(obj, float):
+        return Decimal(str(obj))
+    else:
+        return obj
 
 def handler(event, context):
-    body = json.loads(event.get("body", "{}"))
+    table = dynamodb.Table(os.environ['ORDERS_TABLE'])
 
-    order_id = gen_id()
-    item = {
-        "orderId": order_id,
-        "customerId": body.get("customerId", "demo"),
-        "restaurantId": body.get("restaurantId", "REST-001"),
-        "items": body.get("items", []),
-        "status": "RECEIVED",
-        "createdAt": now(),
+    body = json.loads(event['body'])
+
+    # Agregar un ID de orden
+    body["orderId"] = str(uuid.uuid4())
+    body["status"] = "CREATED"
+
+    # Convertir floats → Decimal
+    item = decimalize(body)
+
+    table.put_item(Item=item)
+
+    return {
+        "statusCode": 200,
+        "body": json.dumps({
+            "message": "Order created",
+            "orderId": body["orderId"]
+        })
     }
-
-    orders().put_item(Item=item)
-
-    publish(
-        "order.service",
-        "Order Created",
-        {"orderId": order_id, "status": "RECEIVED"},
-    )
-
-    return response(201, item)
