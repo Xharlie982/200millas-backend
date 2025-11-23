@@ -1,5 +1,5 @@
 org: guillaumeboussus
-service: millas200-backend
+service: m200-backend
 frameworkVersion: '4'
 
 provider:
