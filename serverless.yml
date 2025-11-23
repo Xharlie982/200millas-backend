@@ -62,9 +62,17 @@ functions:
           method: get
           cors: true
 
-  # ===== WORKFLOW FUNCTION =====
+  # ===== WORKFLOW UPDATE (triggered by EventBridge) =====
   workflowUpdate:
     handler: src/functions/workflow/update.handler
+    events:
+      - eventBridge:
+          eventBus: ${self:provider.environment.EVENT_BUS_NAME}
+          pattern:
+            source:
+              - order.service
+            detail-type:
+              - Order Created
 
   # ===== WEBSOCKETS =====
   websocketConnect:
@@ -89,23 +97,6 @@ functions:
               - order.service
             detail-type:
               - Order Created
-
-stepFunctions:
-  stateMachines:
-    orderWorkflow:
-      name: m200-order-workflow-${self:provider.stage}
-      definition:
-        Comment: "Mini workflow demo"
-        StartAt: StartWorkflow
-        States:
-          StartWorkflow:
-            Type: Pass
-            Result: "Workflow started"
-            Next: UpdateOrder
-          UpdateOrder:
-            Type: Task
-            Resource: arn:aws:lambda:${self:provider.region}:${aws:accountId}:function:${self:service}-${self:provider.stage}-workflowUpdate
-            End: true
 
 resources:
   Resources:
@@ -138,26 +129,3 @@ resources:
           - AttributeName: connectionId
             KeyType: HASH
         BillingMode: PAY_PER_REQUEST
-
-    EventRuleStartWorkflow:
-      Type: AWS::Events::Rule
-      Properties:
-        EventBusName: ${self:provider.environment.EVENT_BUS_NAME}
-        EventPattern:
-          source:
-            - order.service
-          detail-type:
-            - Order Created
-        Targets:
-          - Arn:
-              Fn::GetAtt: [OrderWorkflow, Arn]
-            Id: OrderWorkflowTarget
-
-    PermissionStartWorkflow:
-      Type: AWS::Lambda::Permission
-      Properties:
-        Action: lambda:InvokeFunction
-        Principal: events.amazonaws.com
-        FunctionName:
-          Fn::GetAtt: [workflowUpdate, Arn]
-
