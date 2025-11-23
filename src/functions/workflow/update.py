@@ -1,11 +1,14 @@
 import json
 from datetime import datetime, timezone
-from src.utils.db import orders
-from src.utils.responses import response
+import boto3
+import os
+
+dynamodb = boto3.resource("dynamodb")
+table = dynamodb.Table(os.environ["ORDERS_TABLE"])
 
 def handler(event, context):
-    order_id = event["orderId"]
-    table = orders()
+    detail = event["detail"]
+    order_id = detail["orderId"]
 
     table.update_item(
         Key={"orderId": order_id},
@@ -17,5 +20,5 @@ def handler(event, context):
 
     return {
         "statusCode": 200,
-        "body": json.dumps({"message": "Workflow updated"})
+        "body": json.dumps({"message": "workflow updated"})
     }
