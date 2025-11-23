@@ -8,7 +8,7 @@ provider:
   region: us-east-1
   stage: ${opt:stage, 'dev'}
 
-  # USAMOS EL ROL DE AWS ACADEMY
+  # Rol permitido en AWS Academy
   iam:
     role: arn:aws:iam::156529843879:role/LabRole
 
@@ -16,7 +16,7 @@ provider:
     STAGE: ${self:provider.stage}
     ORDERS_TABLE: ${self:service}-orders-${self:provider.stage}
     CONNECTIONS_TABLE: ${self:service}-connections-${self:provider.stage}
-    EVENT_BUS_NAME: default   # <-- SEGURO, SIEMPRE EXISTE
+    EVENT_BUS_NAME: default
     WEBSOCKET_ENDPOINT:
       Fn::Join:
         - ''
@@ -65,6 +65,7 @@ functions:
           method: put
           cors: true
 
+
   # ------------------------------
   # WEBSOCKETS
   # ------------------------------
@@ -92,8 +93,9 @@ functions:
             detail-type:
               - Order Created
 
+
   # ------------------------------
-  # MINI WORKFLOW STEP FUNCTIONS
+  # MINI WORKFLOW — 2 LAMBDAS
   # ------------------------------
 
   validateOrder:
@@ -104,7 +106,7 @@ functions:
 
 
 # ------------------------------
-# RECURSOS (DynamoDB + StepFunction + Rule)
+# RECURSOS AWS (DynamoDB, StepFunction, EventBridge Rule)
 # ------------------------------
 
 resources:
@@ -140,43 +142,19 @@ resources:
 
 
     # --------------------------
-    # ROLE PARA STEP FUNCTION
-    # --------------------------
-
-    MiniWorkflowRole:
-      Type: AWS::IAM::Role
-      Properties:
-        AssumeRolePolicyDocument:
-          Version: "2012-10-17"
-          Statement:
-            - Effect: Allow
-              Principal:
-                Service: states.amazonaws.com
-              Action: sts:AssumeRole
-        Policies:
-          - PolicyName: MiniWorkflowPolicy
-            PolicyDocument:
-              Version: "2012-10-17"
-              Statement:
-                - Effect: Allow
-                  Action:
-                    - lambda:InvokeFunction
-                  Resource: "*"
-
-
-    # --------------------------
-    # MINI STEP FUNCTION
+    # STEP FUNCTION
     # --------------------------
 
     MiniOrderWorkflow:
       Type: AWS::StepFunctions::StateMachine
       Properties:
         StateMachineName: mini-order-workflow-${self:provider.stage}
-        RoleArn: !GetAtt MiniWorkflowRole.Arn
+        RoleArn: arn:aws:iam::156529843879:role/LabRole
         Definition:
-          Comment: "Mini workflow de validación → READY"
+          Comment: "Mini workflow: CREATED → READY"
           StartAt: Validate
           States:
+
             Validate:
               Type: Task
               Resource:
@@ -184,6 +162,7 @@ resources:
                   - ValidateOrderLambdaFunction
                   - Arn
               Next: MarkReady
+
             MarkReady:
               Type: Task
               Resource:
@@ -194,31 +173,7 @@ resources:
 
 
     # --------------------------
-    # ROLE PARA EVENTBRIDGE
-    # --------------------------
-
-    EventBridgeInvokeRole:
-      Type: AWS::IAM::Role
-      Properties:
-        AssumeRolePolicyDocument:
-          Version: '2012-10-17'
-          Statement:
-            - Effect: Allow
-              Principal:
-                Service: events.amazonaws.com
-              Action: sts:AssumeRole
-        Policies:
-          - PolicyName: StartExecutionPolicy
-            PolicyDocument:
-              Version: '2012-10-17'
-              Statement:
-                - Effect: Allow
-                  Action: states:StartExecution
-                  Resource: "*"
-
-
-    # --------------------------
-    # REGLA: EVENT CREATED → START STEP FUNCTION
+    # EVENTBRIDGE RULE
     # --------------------------
 
     MiniOrderWorkflowStarter:
@@ -233,4 +188,4 @@ resources:
         Targets:
           - Id: "StartMiniWorkflow"
             Arn: !Ref MiniOrderWorkflow
-            RoleArn: !GetAtt EventBridgeInvokeRole.Arn
+            RoleArn: arn:aws:iam::156529843879:role/LabRole
