@@ -40,8 +40,7 @@ provider:
         - execute-api:ManageConnections
       Resource: "*"
 
-plugins:
-  - serverless-offline
+plugins: []
 
 functions:
   createOrder:
