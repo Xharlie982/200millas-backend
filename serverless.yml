@@ -18,7 +18,7 @@ provider:
     RESTAURANTS_TABLE: ${self:service}-restaurants-${self:provider.stage}
     CONNECTIONS_TABLE: ${self:service}-connections-${self:provider.stage}
     EVENT_BUS_NAME: m200bus-${self:provider.stage}
-    ORDER_WORKFLOW_ARN: !Ref OrderWorkflow
+    ORDER_WORKFLOW_ARN: "placeholder"
     WEBSOCKET_ENDPOINT:
       Fn::Join:
         - ''
