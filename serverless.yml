@@ -4,13 +4,21 @@ frameworkVersion: '4'
 
 provider:
   name: aws
-  runtime: python3.14
+  runtime: python3.13
   region: us-east-1
   stage: ${opt:stage, 'dev'}
+
+  iam:
+    role: arn:aws:iam::156529843879:role/LabRole
+
   environment:
+    STAGE: ${self:provider.stage}
     ORDERS_TABLE: ${self:service}-orders-${self:provider.stage}
+    USERS_TABLE: ${self:service}-users-${self:provider.stage}
+    RESTAURANTS_TABLE: ${self:service}-restaurants-${self:provider.stage}
     CONNECTIONS_TABLE: ${self:service}-connections-${self:provider.stage}
-    EVENT_BUS_NAME: m200-events-bus-${self:provider.stage}
+    EVENT_BUS_NAME: m200bus-${self:provider.stage}
+    ORDER_WORKFLOW_ARN: !Ref OrderWorkflow
     WEBSOCKET_ENDPOINT:
       Fn::Join:
         - ''
@@ -20,6 +28,7 @@ provider:
           - ${self:provider.region}
           - '.amazonaws.com/'
           - ${self:provider.stage}
+
 
   iamRoleStatements:
     - Effect: Allow
