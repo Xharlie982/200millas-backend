@@ -185,17 +185,17 @@ resources:
     # EVENTBRIDGE RULE
     # --------------------------
 
-    MiniOrderWorkflowStarter:
-      Type: AWS::Events::Rule
-      Properties:
-        EventBusName: default
-        EventPattern:
-          source:
-            - "order.service"
-          detail-type:
-            - "Order Created"
-        Targets:
-          - Id: "StartMiniWorkflow"
-            Arn: !Ref MiniOrderWorkflow
-            RoleArn: arn:aws:iam::156529843879:role/LabRole
-            InputPath: "$"
+#    MiniOrderWorkflowStarter:
+#      Type: AWS::Events::Rule
+#      Properties:
+#        EventBusName: default
+#        EventPattern:
+#          source:
+#            - "order.service"
+#          detail-type:
+#            - "Order Created"
+#        Targets:
+#          - Id: "StartMiniWorkflow"
+#            Arn: !Ref MiniOrderWorkflow
+#            RoleArn: arn:aws:iam::156529843879:role/LabRole
+#            InputPath: "$"
