@@ -1,0 +1,1307 @@
+org: m4rant
+service: millas-backend
+
+provider:
+  name: aws
+  runtime: python3.12
+  memorySize: 1024
+  timeout: 29
+  iam:
+    role: arn:aws:iam::784426622446:role/LabRole
+  environment:
+    ORDERS_TABLE: ${sls:stage}-Orders
+    WORKFLOW_TABLE: ${sls:stage}-Workflow
+    MENU_TABLE: ${sls:stage}-Menu
+    USERS_TABLE: ${sls:stage}-Users
+    ADDRESSES_TABLE: ${sls:stage}-Addresses
+    TENANT_ID: 200millas
+    MENU_IMAGES_BUCKET: ${self:service}-${sls:stage}-menu-images-v2
+    EVENTBRIDGE_BUS: ${self:service}-${sls:stage}-event-bus
+    SERVERLESS_SERVICE: ${self:service}
+    SERVERLESS_STAGE: ${sls:stage}
+    AWS_ACCOUNT_ID: 784426622446
+    WEBSOCKET_CONNECTIONS_TABLE: ${sls:stage}-WebSocketConnections
+    WEBSOCKET_SUBSCRIPTIONS_TABLE: ${sls:stage}-WebSocketSubscriptions
+    SES_SENDER_EMAIL: marco.galindo.b@utec.edu.pe
+    SNS_TOPIC_ARN: arn:aws:sns:us-east-1:784426622446:200millas-emails
+    STAFF_AVAILABILITY_TABLE: ${sls:stage}-StaffAvailability
+
+custom:
+  pythonRequirements:
+    dockerizePip: true
+    layer: false
+
+functions:
+  # ============================================================================
+  # AUTH - Autenticación y Autorización
+  # ============================================================================
+  
+  login:
+    handler: services/auth/handler.login
+    events:
+      - http:
+          path: /auth/login
+          method: post
+          cors: true
+          integration: lambda
+
+  register:
+    handler: services/auth/handler.register
+    events:
+      - http:
+          path: /auth/register
+          method: post
+          cors: true
+          integration: lambda
+
+  authorize:
+    handler: services/auth/handler.authorize
+
+  logout:
+    handler: services/auth/handler.logout
+    events:
+      - http:
+          path: /auth/logout
+          method: post
+          cors: true
+          integration: lambda
+          authorizer:
+            name: authorize
+            resultTtlInSeconds: 300
+            identitySource: method.request.header.Authorization
+            type: token
+
+  getProfile:
+    handler: services/auth/handler.get_profile
+    events:
+      - http:
+          path: /auth/profile
+          method: get
+          cors: true
+          integration: lambda
+          authorizer:
+            name: authorize
+            resultTtlInSeconds: 300
+            identitySource: method.request.header.Authorization
+            type: token
+
+  updateProfile:
+    handler: services/auth/handler.update_profile
+    events:
+      - http:
+          path: /auth/profile
+          method: patch
+          cors: true
+          integration: lambda
+          authorizer:
+            name: authorize
+            resultTtlInSeconds: 300
+            identitySource: method.request.header.Authorization
+            type: token
+
+  changePassword:
+    handler: services/auth/handler.change_password
+    events:
+      - http:
+          path: /auth/password
+          method: patch
+          cors: true
+          integration: lambda
+          authorizer:
+            name: authorize
+            resultTtlInSeconds: 300
+            identitySource: method.request.header.Authorization
+            type: token
+
+  # ============================================================================
+  # ADDRESSES - Gestión de Direcciones de Entrega
+  # ============================================================================
+
+  getAddresses:
+    handler: services/addresses/handler.get_addresses
+    events:
+      - http:
+          path: /addresses
+          method: get
+          cors: true
+          integration: lambda
+          authorizer:
+            name: authorize
+            resultTtlInSeconds: 300
+            identitySource: method.request.header.Authorization
+            type: token
+
+  createAddress:
+    handler: services/addresses/handler.create_address
+    events:
+      - http:
+          path: /addresses
+          method: post
+          cors: true
+          integration: lambda
+          authorizer:
+            name: authorize
+            resultTtlInSeconds: 300
+            identitySource: method.request.header.Authorization
+            type: token
+
+  updateAddress:
+    handler: services/addresses/handler.update_address
+    events:
+      - http:
+          path: /addresses/{address_id}
+          method: patch
+          cors: true
+          integration: lambda
+          authorizer:
+            name: authorize
+            resultTtlInSeconds: 300
+            identitySource: method.request.header.Authorization
+            type: token
+
+  deleteAddress:
+    handler: services/addresses/handler.delete_address
+    events:
+      - http:
+          path: /addresses/{address_id}
+          method: delete
+          cors: true
+          integration: lambda
+          authorizer:
+            name: authorize
+            resultTtlInSeconds: 300
+            identitySource: method.request.header.Authorization
+            type: token
+
+  # ============================================================================
+  # DRIVER - Endpoints para Repartidores
+  # ============================================================================
+
+  getAvailableOrders:
+    handler: services/driver/handler.get_available_orders
+    events:
+      - http:
+          path: /driver/available
+          method: get
+          cors: true
+          integration: lambda
+          authorizer:
+            name: authorize
+            resultTtlInSeconds: 300
+            identitySource: method.request.header.Authorization
+            type: token
+
+  getAssignedOrders:
+    handler: services/driver/handler.get_assigned_orders
+    events:
+      - http:
+          path: /driver/assigned
+          method: get
+          cors: true
+          integration: lambda
+          authorizer:
+            name: authorize
+            resultTtlInSeconds: 300
+            identitySource: method.request.header.Authorization
+            type: token
+
+  getOrderDetail:
+    handler: services/driver/handler.get_order_detail
+    events:
+      - http:
+          path: /driver/orders/{order_id}
+          method: get
+          cors: true
+          integration: lambda
+          authorizer:
+            name: authorize
+            resultTtlInSeconds: 300
+            identitySource: method.request.header.Authorization
+            type: token
+
+  getDriverStats:
+    handler: services/driver/handler.get_driver_stats
+    events:
+      - http:
+          path: /driver/stats
+          method: get
+          cors: true
+          integration: lambda
+          authorizer:
+            name: authorize
+            resultTtlInSeconds: 300
+            identitySource: method.request.header.Authorization
+            type: token
+
+  getDeliveryTimeline:
+    handler: services/driver/handler.get_delivery_timeline
+    events:
+      - http:
+          path: /driver/timeline/{order_id}
+          method: get
+          cors: true
+          integration: lambda
+          authorizer:
+            name: authorize
+            resultTtlInSeconds: 300
+            identitySource: method.request.header.Authorization
+            type: token
+
+  pickupOrder:
+    handler: services/driver/manual_operations.pickup_order
+    timeout: 29
+    events:
+      - http:
+          path: /driver/pickup/{order_id}
+          method: post
+          cors: true
+          integration: lambda
+          authorizer:
+            name: authorize
+            resultTtlInSeconds: 300
+            identitySource: method.request.header.Authorization
+            type: token
+
+  completeOrder:
+    handler: services/driver/manual_operations.complete_order
+    timeout: 29
+    events:
+      - http:
+          path: /driver/complete/{order_id}
+          method: post
+          cors: true
+          integration: lambda
+          authorizer:
+            name: authorize
+            resultTtlInSeconds: 300
+            identitySource: method.request.header.Authorization
+            type: token
+
+  cancelPickup:
+    handler: services/driver/manual_operations.cancel_pickup
+    timeout: 29
+    events:
+      - http:
+          path: /driver/cancel/{order_id}
+          method: post
+          cors: true
+          integration: lambda
+          authorizer:
+            name: authorize
+            resultTtlInSeconds: 300
+            identitySource: method.request.header.Authorization
+            type: token
+
+  # ============================================================================
+  # ORDERS - Gestión de Pedidos
+  # ============================================================================
+
+  createOrder:
+    handler: services/orders/handler.create_order
+    events:
+      - http:
+          path: /orders
+          method: post
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - Authorization
+              - X-Amz-Date
+              - X-Api-Key
+              - X-Amz-Security-Token
+            allowCredentials: false
+          integration: lambda
+          authorizer:
+            name: authorize
+            resultTtlInSeconds: 300
+            identitySource: method.request.header.Authorization
+            type: token
+
+  getOrders:
+    handler: services/orders/handler.get_orders
+    events:
+      - http:
+          path: /orders
+          method: get
+          cors: true
+          integration: lambda
+          authorizer:
+            name: authorize
+            resultTtlInSeconds: 300
+            identitySource: method.request.header.Authorization
+            type: token
+
+  getOrder:
+    handler: services/orders/handler.get_order
+    events:
+      - http:
+          path: /orders/{order_id}
+          method: get
+          cors: true
+          integration: lambda
+          authorizer:
+            name: authorize
+            resultTtlInSeconds: 300
+            identitySource: method.request.header.Authorization
+            type: token
+
+  getCurrentOrder:
+    handler: services/orders/handler.get_current_order
+    events:
+      - http:
+          path: /orders/current
+          method: get
+          cors: true
+          integration: lambda
+          authorizer:
+            name: authorize
+            resultTtlInSeconds: 300
+            identitySource: method.request.header.Authorization
+            type: token
+
+  getOrderStatus:
+    handler: services/orders/handler.get_order_status
+    events:
+      - http:
+          path: /orders/{order_id}/status
+          method: get
+          cors: true
+          integration: lambda
+          authorizer:
+            name: authorize
+            resultTtlInSeconds: 300
+            identitySource: method.request.header.Authorization
+            type: token
+
+  updateOrderStatus:
+    handler: services/orders/handler.update_order_status
+    events:
+      - http:
+          path: /orders/{order_id}/status
+          method: patch
+          cors: true
+          integration: lambda
+          authorizer:
+            name: authorize
+            resultTtlInSeconds: 300
+            identitySource: method.request.header.Authorization
+            type: token
+
+  # ============================================================================
+  # DASHBOARD - Métricas y Estadísticas
+  # ============================================================================
+
+  getDashboard:
+    handler: services/dashboard/handler.get_dashboard
+    events:
+      - http:
+          path: /dashboard
+          method: get
+          cors: true
+          integration: lambda
+          authorizer:
+            name: authorize
+            resultTtlInSeconds: 300
+            identitySource: method.request.header.Authorization
+            type: token
+
+  getOrderTimeline:
+    handler: services/dashboard/handler.get_order_timeline
+    events:
+      - http:
+          path: /dashboard/timeline/{order_id}
+          method: get
+          cors: true
+          integration: lambda
+          authorizer:
+            name: authorize
+            resultTtlInSeconds: 300
+            identitySource: method.request.header.Authorization
+            type: token
+
+  getStaffPerformance:
+    handler: services/dashboard/handler.get_staff_performance
+    events:
+      - http:
+          path: /dashboard/staff-performance
+          method: get
+          cors: true
+          integration: lambda
+          authorizer:
+            name: authorize
+            resultTtlInSeconds: 300
+            identitySource: method.request.header.Authorization
+            type: token
+
+  # ============================================================================
+  # MENU - Catálogo de Productos
+  # ============================================================================
+
+  getCategories:
+    handler: services/menu/handler.get_categories
+    events:
+      - http:
+          path: /menu/categories
+          method: get
+          cors: true
+          integration: lambda
+
+  getItems:
+    handler: services/menu/handler.get_items
+    events:
+      - http:
+          path: /menu/items
+          method: get
+          cors: true
+          integration: lambda
+
+  uploadMenuImage:
+    handler: services/menu/upload_image.upload_image
+    events:
+      - http:
+          path: /menu/upload-image
+          method: post
+          cors: true
+          integration: lambda
+          authorizer:
+            name: authorize
+            resultTtlInSeconds: 300
+            identitySource: method.request.header.Authorization
+            type: token
+
+  # ============================================================================
+  # ADMIN - Gestión de Usuarios
+  # ============================================================================
+
+  listChefs:
+    handler: services/admin/handler.list_chefs
+    events:
+      - http:
+          path: /admin/chefs
+          method: get
+          cors: true
+          integration: lambda
+          authorizer:
+            name: authorize
+            resultTtlInSeconds: 300
+            identitySource: method.request.header.Authorization
+            type: token
+
+  listDrivers:
+    handler: services/admin/handler.list_drivers
+    events:
+      - http:
+          path: /admin/drivers
+          method: get
+          cors: true
+          integration: lambda
+          authorizer:
+            name: authorize
+            resultTtlInSeconds: 300
+            identitySource: method.request.header.Authorization
+            type: token
+
+  listAllUsers:
+    handler: services/admin/handler.list_all_users
+    events:
+      - http:
+          path: /admin/users
+          method: get
+          cors: true
+          integration: lambda
+          authorizer:
+            name: authorize
+            resultTtlInSeconds: 300
+            identitySource: method.request.header.Authorization
+            type: token
+
+  # ============================================================================
+  # WORKFLOW - Step Functions Handlers (Internos)
+  # ============================================================================
+
+  confirmOrder:
+    handler: services/workflow/step_functions_handlers.confirm_order
+    timeout: 30
+
+  assignCook:
+    handler: services/workflow/step_functions_handlers.assign_cook
+    timeout: 30
+    environment:
+      CHEF_ASSIGNMENT_QUEUE:
+        'Fn::GetAtt':
+          - ChefAssignmentQueue
+          - QueueUrl
+
+  completeCooking:
+    handler: services/workflow/step_functions_handlers.complete_cooking
+    timeout: 30
+
+  completePacking:
+    handler: services/workflow/step_functions_handlers.complete_packing
+    timeout: 30
+
+  handleOrderFailure:
+    handler: services/workflow/step_functions_handlers.handle_order_failure
+    timeout: 30
+
+  # ============================================================================
+  # SQS PROCESSORS - NUEVOS
+  # ============================================================================
+
+  processChefQueue:
+    handler: services/queue/chef_processor.process_chef_assignments
+    timeout: 60
+    events:
+      - sqs:
+          arn: !GetAtt ChefAssignmentQueue.Arn
+          batchSize: 1
+
+  processDriverQueue:
+    handler: services/queue/driver_processor.process_driver_assignments
+    timeout: 60
+    events:
+      - sqs:
+          arn: !GetAtt DriverAssignmentQueue.Arn
+          batchSize: 1
+
+  # ============================================================================
+  # CHEF - Endpoints para Chefs (Cocinar y Empaquetar)
+  # ============================================================================
+
+  getChefAssignedOrders:
+    handler: services/chef/handler.get_assigned_orders
+    events:
+      - http:
+          path: /chef/assigned
+          method: get
+          cors: true
+          integration: lambda
+          authorizer:
+            name: authorize
+            resultTtlInSeconds: 300
+            identitySource: method.request.header.Authorization
+            type: token
+
+  getChefOrderDetail:
+    handler: services/chef/handler.get_order_detail
+    events:
+      - http:
+          path: /chef/orders/{order_id}
+          method: get
+          cors: true
+          integration: lambda
+          authorizer:
+            name: authorize
+            resultTtlInSeconds: 300
+            identitySource: method.request.header.Authorization
+            type: token
+
+  completeCookingManual:
+    handler: services/chef/handler.complete_cooking
+    timeout: 29
+    events:
+      - http:
+          path: /chef/complete-cooking/{order_id}
+          method: post
+          cors: true
+          integration: lambda
+          authorizer:
+            name: authorize
+            resultTtlInSeconds: 300
+            identitySource: method.request.header.Authorization
+            type: token
+
+  completePackingManual:
+    handler: services/chef/handler.complete_packing
+    timeout: 29
+    events:
+      - http:
+          path: /chef/complete-packing/{order_id}
+          method: post
+          cors: true
+          integration: lambda
+          authorizer:
+            name: authorize
+            resultTtlInSeconds: 300
+            identitySource: method.request.header.Authorization
+            type: token
+
+  # ============================================================================
+  # CHEF AVAILABILITY - NUEVOS
+  # ============================================================================
+
+  reportChefAvailability:
+    handler: services/queue/chef_availability.report_availability
+    events:
+      - http:
+          path: /chef/availability
+          method: post
+          cors: true
+          integration: lambda
+          authorizer:
+            name: authorize
+            resultTtlInSeconds: 300
+            identitySource: method.request.header.Authorization
+            type: token
+
+  getAvailableChefs:
+    handler: services/queue/chef_availability.get_available_chefs
+    events:
+      - http:
+          path: /chef/available
+          method: get
+          cors: true
+          integration: lambda
+          authorizer:
+            name: authorize
+            resultTtlInSeconds: 300
+            identitySource: method.request.header.Authorization
+            type: token
+
+  # ============================================================================
+  # DRIVER AVAILABILITY - NUEVOS
+  # ============================================================================
+
+  reportDriverAvailability:
+    handler: services/queue/driver_availability.report_availability
+    events:
+      - http:
+          path: /driver/availability
+          method: post
+          cors: true
+          integration: lambda
+          authorizer:
+            name: authorize
+            resultTtlInSeconds: 300
+            identitySource: method.request.header.Authorization
+            type: token
+
+  getAvailableDriversList:
+    handler: services/queue/driver_availability.get_available_drivers
+    events:
+      - http:
+          path: /driver/available-list
+          method: get
+          cors: true
+          integration: lambda
+          authorizer:
+            name: authorize
+            resultTtlInSeconds: 300
+            identitySource: method.request.header.Authorization
+            type: token
+
+  # ============================================================================
+  # WEBSOCKET - Notificaciones en Tiempo Real
+  # ============================================================================
+
+  wsConnect:
+    handler: services/websocket/handler.connect
+    events:
+      - websocket:
+          route: $connect
+
+  wsDisconnect:
+    handler: services/websocket/handler.disconnect
+    events:
+      - websocket:
+          route: $disconnect
+
+  wsDefault:
+    handler: services/websocket/handler.default
+    events:
+      - websocket:
+          route: $default
+
+  wsNotifyOrderUpdate:
+    handler: services/websocket/handler.notify_order_update
+    timeout: 30
+    environment:
+      WEBSOCKET_CONNECTIONS_TABLE: ${sls:stage}-WebSocketConnections
+      WEBSOCKET_SUBSCRIPTIONS_TABLE: ${sls:stage}-WebSocketSubscriptions
+      WEBSOCKET_API_ID: !GetAtt WebsocketsApi.ApiId
+      SERVERLESS_STAGE: ${sls:stage}
+
+  # ============================================================================
+  # EMAIL - Notificaciones por Email
+  # ============================================================================
+
+  sendOrderEmails:
+    handler: services/email/handler.send_order_notifications
+    timeout: 29
+
+# ============================================================================
+# RECURSOS DE AWS
+# ============================================================================
+
+resources:
+  Resources:
+    # ========================================
+    # DynamoDB Tables
+    # ========================================
+
+    OrdersTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.ORDERS_TABLE}
+        AttributeDefinitions:
+          - AttributeName: order_id
+            AttributeType: S
+          - AttributeName: tenant_id
+            AttributeType: S
+          - AttributeName: created_at
+            AttributeType: N
+          - AttributeName: customer_id
+            AttributeType: S
+          - AttributeName: status
+            AttributeType: S
+        KeySchema:
+          - AttributeName: order_id
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: tenant-created-index
+            KeySchema:
+              - AttributeName: tenant_id
+                KeyType: HASH
+              - AttributeName: created_at
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+          - IndexName: customer-orders-index
+            KeySchema:
+              - AttributeName: customer_id
+                KeyType: HASH
+              - AttributeName: created_at
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+          - IndexName: tenant-status-index
+            KeySchema:
+              - AttributeName: tenant_id
+                KeyType: HASH
+              - AttributeName: status
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+        BillingMode: PAY_PER_REQUEST
+
+    WorkflowTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.WORKFLOW_TABLE}
+        AttributeDefinitions:
+          - AttributeName: order_id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: order_id
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+
+    MenuTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.MENU_TABLE}
+        AttributeDefinitions:
+          - AttributeName: item_id
+            AttributeType: S
+          - AttributeName: category
+            AttributeType: S
+        KeySchema:
+          - AttributeName: item_id
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: category-index
+            KeySchema:
+              - AttributeName: category
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+        BillingMode: PAY_PER_REQUEST
+
+    UsersTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.USERS_TABLE}
+        AttributeDefinitions:
+          - AttributeName: email
+            AttributeType: S
+        KeySchema:
+          - AttributeName: email
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+
+    AddressesTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.ADDRESSES_TABLE}
+        AttributeDefinitions:
+          - AttributeName: address_id
+            AttributeType: S
+          - AttributeName: user_email
+            AttributeType: S
+        KeySchema:
+          - AttributeName: address_id
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: user-addresses-index
+            KeySchema:
+              - AttributeName: user_email
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+        BillingMode: PAY_PER_REQUEST
+
+    WebSocketConnectionsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${sls:stage}-WebSocketConnections
+        AttributeDefinitions:
+          - AttributeName: connection_id
+            AttributeType: S
+          - AttributeName: user_id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: connection_id
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: user-id-index
+            KeySchema:
+              - AttributeName: user_id
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+        BillingMode: PAY_PER_REQUEST
+        TimeToLiveSpecification:
+          AttributeName: expires_at
+          Enabled: true
+
+    WebSocketSubscriptionsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${sls:stage}-WebSocketSubscriptions
+        AttributeDefinitions:
+          - AttributeName: subscription_id
+            AttributeType: S
+          - AttributeName: order_id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: subscription_id
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: order-id-index
+            KeySchema:
+              - AttributeName: order_id
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+        BillingMode: PAY_PER_REQUEST
+
+    # ========================================
+    # STAFF AVAILABILITY TABLE - NUEVO
+    # ========================================
+
+    StaffAvailabilityTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.STAFF_AVAILABILITY_TABLE}
+        AttributeDefinitions:
+          - AttributeName: staff_id
+            AttributeType: S
+          - AttributeName: staff_type
+            AttributeType: S
+        KeySchema:
+          - AttributeName: staff_id
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: staff-type-index
+            KeySchema:
+              - AttributeName: staff_type
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+        BillingMode: PAY_PER_REQUEST
+        TimeToLiveSpecification:
+          AttributeName: expires_at
+          Enabled: true
+
+    # ========================================
+    # SQS QUEUES - NUEVO
+    # ========================================
+
+    ChefAssignmentQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: ${self:service}-${sls:stage}-chef-queue
+        VisibilityTimeout: 120
+        MessageRetentionPeriod: 3600
+        ReceiveMessageWaitTimeSeconds: 20
+        RedrivePolicy:
+          deadLetterTargetArn: !GetAtt ChefAssignmentDLQ.Arn
+          maxReceiveCount: 3
+
+    ChefAssignmentDLQ:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: ${self:service}-${sls:stage}-chef-dlq
+        MessageRetentionPeriod: 86400
+
+    DriverAssignmentQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: ${self:service}-${sls:stage}-driver-queue
+        VisibilityTimeout: 120
+        MessageRetentionPeriod: 3600
+        ReceiveMessageWaitTimeSeconds: 20
+        RedrivePolicy:
+          deadLetterTargetArn: !GetAtt DriverAssignmentDLQ.Arn
+          maxReceiveCount: 3
+
+    DriverAssignmentDLQ:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: ${self:service}-${sls:stage}-driver-dlq
+        MessageRetentionPeriod: 86400
+
+    # ========================================
+    # S3 Bucket para Imágenes del Menú
+    # ========================================
+
+    MenuImagesBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:provider.environment.MENU_IMAGES_BUCKET}
+        PublicAccessBlockConfiguration:
+          BlockPublicAcls: false
+          BlockPublicPolicy: false
+          IgnorePublicAcls: false
+          RestrictPublicBuckets: false
+        CorsConfiguration:
+          CorsRules:
+            - AllowedHeaders:
+                - "*"
+              AllowedMethods:
+                - GET
+                - PUT
+                - POST
+                - HEAD
+              AllowedOrigins:
+                - "*"
+              MaxAge: 3000
+
+    MenuImagesBucketPolicy:
+      Type: AWS::S3::BucketPolicy
+      Properties:
+        Bucket: !Ref MenuImagesBucket
+        PolicyDocument:
+          Statement:
+            - Sid: PublicReadGetObject
+              Effect: Allow
+              Principal: "*"
+              Action:
+                - s3:GetObject
+              Resource: !Sub 
+                - "arn:aws:s3:::${BucketName}/*"
+                - BucketName: !Ref MenuImagesBucket
+
+    # ========================================
+    # EventBridge - Bus de Eventos
+    # ========================================
+
+    CustomEventBus:
+      Type: AWS::Events::EventBus
+      Properties:
+        Name: ${self:service}-${sls:stage}-event-bus
+
+    OrderEventsRule:
+      Type: AWS::Events::Rule
+      Properties:
+        EventBusName: !Ref CustomEventBus
+        EventPattern:
+          source:
+            - orders.service
+            - workflow.service
+            - driver.service
+            - queue.service
+            - chef.service
+          detail-type:
+            - OrderCreated
+            - OrderUpdated
+            - OrderConfirmed
+            - OrderCooking
+            - OrderCookingCompleted
+            - OrderPacking
+            - OrderPacked
+            - OrderReady
+            - OrderPickedUp
+            - OrderInDelivery
+            - OrderDelivered
+            - OrderPickupCanceled
+            - OrderFailed
+            - OrderAssignedToChef
+            - OrderAssignedToDriver
+        State: ENABLED
+        Description: Captura todos los eventos relacionados con pedidos y workflow
+
+    # ========================================
+    # Step Functions - Workflow Automatizado
+    # ========================================
+
+    OrderWorkflowStateMachine:
+      Type: AWS::StepFunctions::StateMachine
+      Properties:
+        StateMachineName: ${self:service}-${sls:stage}-order-workflow
+        RoleArn: arn:aws:iam::784426622446:role/LabRole
+        DefinitionString: !Sub |
+          {
+            "Comment": "Workflow automatizado: Chef cocina y empaqueta, luego driver entrega",
+            "StartAt": "ConfirmOrder",
+            "States": {
+              "ConfirmOrder": {
+                "Type": "Task",
+                "Resource": "${ConfirmOrderLambdaFunction.Arn}",
+                "ResultPath": "$.confirmResult",
+                "TimeoutSeconds": 30,
+                "Retry": [
+                  {
+                    "ErrorEquals": ["States.TaskFailed", "States.Timeout"],
+                    "IntervalSeconds": 2,
+                    "MaxAttempts": 3,
+                    "BackoffRate": 2.0
+                  }
+                ],
+                "Catch": [
+                  {
+                    "ErrorEquals": ["States.ALL"],
+                    "ResultPath": "$.error",
+                    "Next": "OrderFailed"
+                  }
+                ],
+                "Next": "AssignCook"
+              },
+              "AssignCook": {
+                "Type": "Task",
+                "Resource": "${AssignCookLambdaFunction.Arn}",
+                "ResultPath": "$.cookResult",
+                "TimeoutSeconds": 30,
+                "Retry": [
+                  {
+                    "ErrorEquals": ["States.TaskFailed", "States.Timeout"],
+                    "IntervalSeconds": 2,
+                    "MaxAttempts": 3,
+                    "BackoffRate": 2.0
+                  }
+                ],
+                "Catch": [
+                  {
+                    "ErrorEquals": ["States.ALL"],
+                    "ResultPath": "$.error",
+                    "Next": "OrderFailed"
+                  }
+                ],
+                "Next": "WaitForCooking"
+              },
+              "WaitForCooking": {
+                "Type": "Wait",
+                "Seconds": 300,
+                "Next": "CompleteCooking"
+              },
+              "CompleteCooking": {
+                "Type": "Task",
+                "Resource": "${CompleteCookingLambdaFunction.Arn}",
+                "ResultPath": "$.cookingResult",
+                "TimeoutSeconds": 30,
+                "Retry": [
+                  {
+                    "ErrorEquals": ["States.TaskFailed", "States.Timeout"],
+                    "IntervalSeconds": 2,
+                    "MaxAttempts": 3,
+                    "BackoffRate": 2.0
+                  }
+                ],
+                "Catch": [
+                  {
+                    "ErrorEquals": ["States.ALL"],
+                    "ResultPath": "$.error",
+                    "Next": "OrderFailed"
+                  }
+                ],
+                "Next": "WaitForPacking"
+              },
+              "WaitForPacking": {
+                "Type": "Wait",
+                "Seconds": 120,
+                "Next": "CompletePacking"
+              },
+              "CompletePacking": {
+                "Type": "Task",
+                "Resource": "${CompletePackingLambdaFunction.Arn}",
+                "ResultPath": "$.packingResult",
+                "TimeoutSeconds": 30,
+                "Retry": [
+                  {
+                    "ErrorEquals": ["States.TaskFailed", "States.Timeout"],
+                    "IntervalSeconds": 2,
+                    "MaxAttempts": 3,
+                    "BackoffRate": 2.0
+                  }
+                ],
+                "Catch": [
+                  {
+                    "ErrorEquals": ["States.ALL"],
+                    "ResultPath": "$.error",
+                    "Next": "OrderFailed"
+                  }
+                ],
+                "Next": "WaitForDriverPickup"
+              },
+              "WaitForDriverPickup": {
+                "Type": "Wait",
+                "Seconds": 7200,
+                "Next": "WorkflowCompleted"
+              },
+              "WorkflowCompleted": {
+                "Type": "Succeed"
+              },
+              "OrderFailed": {
+                "Type": "Task",
+                "Resource": "${HandleOrderFailureLambdaFunction.Arn}",
+                "ResultPath": "$.failureResult",
+                "End": true
+              }
+            }
+          }
+
+    # ========================================
+    # EventBridge Rules - WebSocket Notifications
+    # ========================================
+
+    OrderStatusChangedRule:
+      Type: AWS::Events::Rule
+      Properties:
+        EventBusName: !Ref CustomEventBus
+        EventPattern:
+          source:
+            - orders.service
+            - driver.service
+            - workflow.service
+            - queue.service
+            - chef.service
+          detail-type:
+            - OrderCreated
+            - OrderStatusChanged
+            - OrderConfirmed
+            - OrderCooking
+            - OrderCookingCompleted
+            - OrderPacking
+            - OrderPacked
+            - OrderReady
+            - OrderPickedUp
+            - OrderInDelivery
+            - OrderDelivered
+            - OrderPickupCanceled
+            - OrderAssignedToChef
+            - OrderAssignedToDriver
+        State: ENABLED
+        Targets:
+          - Arn: !GetAtt WsNotifyOrderUpdateLambdaFunction.Arn
+            RoleArn: arn:aws:iam::784426622446:role/LabRole
+            Id: WsNotifyOrderUpdateTarget
+
+    OrderStatusChangedRulePermission:
+      Type: AWS::Lambda::Permission
+      Properties:
+        FunctionName: !Ref WsNotifyOrderUpdateLambdaFunction
+        Action: lambda:InvokeFunction
+        Principal: events.amazonaws.com
+        SourceArn: !GetAtt OrderStatusChangedRule.Arn
+
+    # ========================================
+    # EventBridge Rules - Email Notifications
+    # ========================================
+
+    OrderEmailsRule:
+      Type: AWS::Events::Rule
+      Properties:
+        EventBusName: !Ref CustomEventBus
+        EventPattern:
+          source:
+            - orders.service
+            - driver.service
+            - workflow.service
+            - queue.service
+            - chef.service
+          detail-type:
+            - OrderCreated
+            - OrderStatusChanged
+            - OrderConfirmed
+            - OrderCooking
+            - OrderCookingCompleted
+            - OrderPacking
+            - OrderPacked
+            - OrderReady
+            - OrderPickedUp
+            - OrderInDelivery
+            - OrderDelivered
+            - OrderPickupCanceled
+        State: ENABLED
+        Targets:
+          - Arn: !GetAtt SendOrderEmailsLambdaFunction.Arn
+            RoleArn: arn:aws:iam::784426622446:role/LabRole
+            Id: SendOrderEmailsTarget
+
+    OrderEmailsRulePermission:
+      Type: AWS::Lambda::Permission
+      Properties:
+        FunctionName: !Ref SendOrderEmailsLambdaFunction
+        Action: lambda:InvokeFunction
+        Principal: events.amazonaws.com
+        SourceArn: !GetAtt OrderEmailsRule.Arn
+
+# ============================================================================
+# OUTPUTS
+# ============================================================================
+
+outputs:
+  ApiGatewayRestApiId:
+    Description: API Gateway REST API ID
+    Value:
+      Ref: ApiGatewayRestApi
+    Export:
+      Name: ${self:service}-${sls:stage}-ApiGatewayId
+
+  ApiGatewayRestApiUrl:
+    Description: URL base de la API Gateway
+    Value: !Sub "https://${ApiGatewayRestApi}.execute-api.${AWS::Region}.amazonaws.com/${sls:stage}"
+    Export:
+      Name: ${self:service}-${sls:stage}-ApiGatewayUrl
+
+  OrderWorkflowStateMachineArn:
+    Description: ARN de la Step Function para workflow de pedidos
+    Value: !Ref OrderWorkflowStateMachine
+    Export:
+      Name: ${self:service}-${sls:stage}-OrderWorkflowArn
+
+  CustomEventBusName:
+    Description: Nombre del Event Bus personalizado
+    Value: !Ref CustomEventBus
+    Export:
+      Name: ${self:service}-${sls:stage}-EventBusName
+
+  WebSocketApiEndpoint:
+    Description: WebSocket API Endpoint
+    Value: !Sub "wss://${WebsocketsApi}.execute-api.${AWS::Region}.amazonaws.com/${sls:stage}"
+    Export:
+      Name: ${self:service}-${sls:stage}-WebSocketEndpoint
+
+  ChefQueueUrl:
+    Description: URL de la cola de asignación de chefs
+    Value: !GetAtt ChefAssignmentQueue.QueueUrl
+    Export:
+      Name: ${self:service}-${sls:stage}-ChefQueueUrl
+
+  DriverQueueUrl:
+    Description: URL de la cola de asignación de drivers
+    Value: !GetAtt DriverAssignmentQueue.QueueUrl
+    Export:
+      Name: ${self:service}-${sls:stage}-DriverQueueUrl
+
